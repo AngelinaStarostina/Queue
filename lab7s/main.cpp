@@ -1,8 +1,5 @@
-#include <math.h>
 #include <time.h>
 #include "Header.h"
-#include <stack>
-
 using namespace std;
 
 CRITICAL_SECTION criticalSection;
@@ -16,17 +13,21 @@ DWORD WINAPI producer(LPVOID v)
 
 	for (int i = 0; i < parametrs->number; i++) 
 	{
-		WaitForSingleObject(em, INFINITE);
+		if (WaitForSingleObject(em, 10000) == WAIT_TIMEOUT)
+		{
+			cout << "The queue has not been released" << endl;
+			break;
+		}
 		EnterCriticalSection(&criticalSection);
 
-		unsigned int c = rand() % 50;
-		parametrs->queue->AddHead(c);
+		unsigned int ui = rand() % 50;
+		parametrs->queue->AddHead(ui);
 		cout << "Producer: " << parametrs->threadNumder << ". ";
-		cout << " Element: " << c << " produced" << endl;
-		parametrs->queue->out();
+		cout << " Element: " << ui << " produced" << endl;
+		parametrs->queue->getQueue();
 		LeaveCriticalSection(&criticalSection);
 
-		while (!ReleaseSemaphore(full, 1, NULL));
+		ReleaseSemaphore(full, 1, NULL);
 	}
 
 	return 0;
@@ -36,20 +37,23 @@ DWORD WINAPI consumer(LPVOID v)
 {
 	toThread *parametrs = (toThread*)v;
 	
-
 	for (int i = 0; i < parametrs->number; i++)
 	{
-		WaitForSingleObject(full, INFINITE);
+		if (WaitForSingleObject(full, 10000) == WAIT_TIMEOUT)
+		{
+			cout << "No elements were added to an empty queue" << endl;
+			break;
+		}
 		EnterCriticalSection(&criticalSection);
 
 		unsigned short c = parametrs->queue->RemoveTail();
 		cout << "Consumer : " << parametrs->threadNumder << ". ";
 		cout << " Element : " << c << " removed" << endl;
-		parametrs->queue->out();
+		parametrs->queue->getQueue();
 
 		LeaveCriticalSection(&criticalSection);
 
-		while (!ReleaseSemaphore(em, 1, NULL));
+		ReleaseSemaphore(em, 1, NULL);
 	}
 
 	return 0;
@@ -58,13 +62,11 @@ DWORD WINAPI consumer(LPVOID v)
 int main() 
 {
 	setlocale(LC_ALL, "rus");
-	srand(time(0));
-
 
 	cout << "Enter the number of elements: " << endl;
 	int size;
 	cin >> size;
-	MonitorQueue *stack = new MonitorQueue(size);
+	MonitorQueue *queue = new MonitorQueue(size);
 	em = CreateSemaphore(NULL, size, size, "Empty");
 	full = CreateSemaphore(NULL, 0, size, "Full");
 	InitializeCriticalSection(&criticalSection);
@@ -95,37 +97,28 @@ int main()
 		consumerProductCount[i] = product;
 	}
 	
-	HANDLE *arr = new HANDLE[producerThreadCount + consumerThreadCount];
 	int k = 0;
 
-	ThreadData **producerThreadData = new ThreadData*[producerThreadCount + consumerThreadCount];
+	DWORD *threadID = new DWORD[producerThreadCount + consumerThreadCount];
+	HANDLE *threadHandle = new HANDLE[producerThreadCount + consumerThreadCount];
 
 	for (int i = 0; i < producerThreadCount; i++) {
-		producerThreadData[i] = new ThreadData();
-		toThread *treadInfo = new toThread(stack, producerProductCount[i], i + 1);
-		producerThreadData[i]->handle = CreateThread(NULL, 0, producer, (void*&)(treadInfo), 0, &producerThreadData[i]->id);
-
-		arr[k] = producerThreadData[i]->handle;
+		srand(time(0));
+		toThread *threadInfo = new toThread(queue, producerProductCount[i], i + 1);
+		threadHandle[i] = CreateThread(NULL, 0, producer, (void*&)(threadInfo), 0, &threadID[i]);
 		k++;
 	}
-
-	ThreadData **consumerThreadData = new ThreadData*[consumerThreadCount];
 
 	for (int i = 0; i < consumerThreadCount; i++) {
-		consumerThreadData[i] = new ThreadData();
-		toThread *tp = new toThread(stack, consumerProductCount[i], i + 1);
-		consumerThreadData[i]->handle = CreateThread(NULL, 0, consumer, (void*)(tp), 0, &consumerThreadData[i]->id);
-
-		arr[k] = consumerThreadData[i]->handle;
+		toThread *threadInfo = new toThread(queue, consumerProductCount[i], i + 1);
+		threadHandle[k] = CreateThread(NULL, 0, consumer, (void*)(threadInfo), 0, &threadID[k]);
 		k++;
 	}
 
-	WaitForMultipleObjects(producerThreadCount + consumerThreadCount, arr, TRUE, INFINITE);
+	WaitForMultipleObjects(producerThreadCount + consumerThreadCount, threadHandle, TRUE, INFINITE);
 
-	for (int i = 0; i < producerThreadCount; i++)
-		CloseHandle(producerThreadData[i]->handle);
-	for (int i = 0; i < consumerThreadCount; i++)
-		CloseHandle(consumerThreadData[i]->handle);
+	for (int i = 0; i < k; i++)
+		CloseHandle(threadHandle[i]);
 
 	system("pause");
 	return 0;

@@ -6,37 +6,37 @@ using namespace std;
 
 class MonitorQueue {
 private:
-	unsigned short *arr;
+	unsigned short *queue;
 	int n;
 	int num;
 
 public:
 	MonitorQueue(int size) {
 		n = size;
-		arr = new unsigned short[size];
+		queue = new unsigned short[size];
 		num = 0;
 	}
 
 	~MonitorQueue() {
-		delete[]arr;
+		delete[]queue;
 	}
 
 	void AddHead(unsigned short element) {
 		if (num < n) {
-			arr[num++] = element;
+			queue[num++] = element;
 		}
 	}
 
 	unsigned short RemoveTail() {
 		if (num > 0) {
-			return arr[--num];
+			return queue[--num];
 
 		}
 	}
 
-	void out() {
+	void getQueue() {
 		for (int i = 0; i < num; i++) {
-			cout << arr[i] << " ";
+			cout << queue[i] << " ";
 		}
 		cout << endl;
 	}
@@ -55,9 +55,3 @@ struct toThread {
 		threadNumder = threadNum;
 	}
 };
-
-struct ThreadData {
-	HANDLE handle;
-	DWORD id;
-};
-
